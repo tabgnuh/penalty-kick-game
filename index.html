@@ -1,1 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penalty Kick - Soccer Challenge</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>⚽ PENALTY KICK ⚽</h1>
+        <div class="score">
+            <div>Score: <span id="score">0</span></div>
+            <div>Shots: <span id="shots">0</span>/5</div>
+        </div>
+        
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        
+        <div class="controls">
+            <p><strong>How to play:</strong> Click and drag from the ball to aim. Release to shoot!</p>
+            <button id="restartBtn">New Game</button>
+        </div>
+    </div>
 
+    <script src="script.js"></script>
+</body>
+</html>
