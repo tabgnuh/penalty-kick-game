@@ -9,114 +9,163 @@ let shots = 0;
 const maxShots = 5;
 
 // Game objects
-let ball = { x: 400, y: 420, radius: 15, vx: 0, vy: 0, shooting: false };
-let goalkeeper = { x: 350, width: 80, height: 120 };
+let ball = { x: 150, y: 380, radius: 18, vx: 0, vy: 0, shooting: false };
+
+let player = { 
+    x: 80, y: 280, 
+    width: 120, height: 160,
+    kicking: false, 
+    kickProgress: 0 
+};
+
+let goalkeeper = { 
+    x: 380, y: 140,
+    width: 110, height: 160,
+    targetX: 380,
+    diving: null, // 'left', 'right', null
+    diveProgress: 0
+};
+
+// Images
+const images = {
+    shibaStand: new Image(),
+    shibaKick: new Image(),
+    huskyStand: new Image(),
+    huskyLeft: new Image(),
+    huskyRight: new Image(),
+    ballImg: new Image()
+};
+
+// Load images
+function loadImages() {
+    images.shibaStand.src = 'images/shiba-stand.png';
+    images.shibaKick.src = 'images/shiba-kick.png';
+    images.huskyStand.src = 'images/husky-stand.png';
+    images.huskyLeft.src = 'images/husky-dive-left.png';
+    images.huskyRight.src = 'images/husky-dive-right.png';
+    images.ballImg.src = 'https://i.imgur.com/8v5f9.png'; // bóng mặc định (có thể thay bằng file local)
+}
+
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
-
 let gameOver = false;
 
-// Simple goal posts
+// Draw field
 function drawField() {
-    // Grass
     ctx.fillStyle = '#0a3d0a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Penalty area
+
     ctx.strokeStyle = 'white';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(200, 250, 400, 250);
-    
+    ctx.lineWidth = 5;
+    ctx.strokeRect(100, 220, 500, 280);
+
     // Goal
-    ctx.fillStyle = '#222';
-    ctx.fillRect(280, 150, 240, 15); // crossbar
-    ctx.fillRect(280, 150, 10, 120);
-    ctx.fillRect(510, 150, 10, 120);
-    
-    // Net lines
-    ctx.strokeStyle = '#ccc';
-    ctx.lineWidth = 2;
-    for (let i = 290; i < 520; i += 30) {
-        ctx.beginPath();
-        ctx.moveTo(i, 155);
-        ctx.lineTo(i, 260);
-        ctx.stroke();
-    }
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(280, 130, 240, 20);
+    ctx.fillRect(280, 130, 12, 150);
+    ctx.fillRect(508, 130, 12, 150);
 }
 
-// Draw everything
+// Draw player (Shiba)
+function drawPlayer() {
+    const img = player.kicking ? images.shibaKick : images.shibaStand;
+    ctx.drawImage(img, player.x, player.y, player.width, player.height);
+}
+
+// Draw Goalkeeper (Husky)
+function drawGoalkeeper() {
+    let img = images.huskyStand;
+    
+    if (goalkeeper.diving === 'left') img = images.huskyLeft;
+    if (goalkeeper.diving === 'right') img = images.huskyRight;
+
+    ctx.drawImage(img, goalkeeper.x, goalkeeper.y, goalkeeper.width, goalkeeper.height);
+}
+
+// Main draw
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawField();
-    
-    // Goalkeeper (simple rectangle + head)
-    ctx.fillStyle = '#ff4444';
-    ctx.fillRect(goalkeeper.x, 180, goalkeeper.width, goalkeeper.height);
-    ctx.fillStyle = '#ffdbac';
-    ctx.beginPath();
-    ctx.arc(goalkeeper.x + 40, 170, 20, 0, Math.PI * 2);
-    ctx.fill();
-    
+    drawPlayer();
+    drawGoalkeeper();
+
     // Ball
-    ctx.fillStyle = 'white';
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    
-    // Power indicator when dragging
+    ctx.drawImage(images.ballImg, ball.x - ball.radius, ball.y - ball.radius, ball.radius * 2, ball.radius * 2);
+
     if (isDragging) {
-        ctx.strokeStyle = 'yellow';
-        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+        ctx.lineWidth = 6;
+        ctx.setLineDash([10, 5]);
         ctx.beginPath();
         ctx.moveTo(ball.x, ball.y);
         ctx.lineTo(dragStartX, dragStartY);
         ctx.stroke();
+        ctx.setLineDash([]);
     }
-    
-    // UI text
+
     if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = score >= 3 ? '#0f0' : '#f00';
-        ctx.font = 'bold 50px Arial';
-        ctx.fillText(score >= 3 ? 'YOU WIN!' : 'GAME OVER', 220, 250);
+        ctx.fillStyle = score >= 3 ? '#4ade80' : '#f87171';
+        ctx.font = 'bold 60px Arial';
+        ctx.fillText(score >= 3 ? 'VICTORY!' : 'GAME OVER', 170, 240);
+        ctx.font = 'bold 32px Arial';
+        ctx.fillText(`Final Score: ${score} / 5`, 260, 300);
     }
 }
 
-// Update game logic
+// Update
 function update() {
     if (ball.shooting) {
         ball.x += ball.vx;
         ball.y += ball.vy;
-        ball.vy += 0.4; // gravity
-        
+        ball.vy += 0.45;
+
+        // Goalkeeper AI
+        const predictedX = ball.x + ball.vx * 7;
+        goalkeeper.targetX = Math.max(280, Math.min(480, predictedX - 50));
+
+        if (!goalkeeper.diving) {
+            goalkeeper.x += (goalkeeper.targetX - goalkeeper.x) * 0.2;
+        }
+
         // Collision with goalkeeper
         if (
             ball.x > goalkeeper.x && 
             ball.x < goalkeeper.x + goalkeeper.width &&
-            ball.y > 180 && ball.y < 300 &&
-            Math.abs(ball.vy) > 2
+            ball.y > goalkeeper.y && 
+            ball.y < goalkeeper.y + goalkeeper.height - 30
         ) {
-            ball.vx = -ball.vx * 0.6;
-            ball.vy = -8;
-            setTimeout(resetShot, 800);
+            goalkeeper.diving = ball.vx < 0 ? 'left' : 'right';
+            goalkeeper.diveProgress = 0;
+            ball.vx *= -0.6;
+            ball.vy = -10;
+            setTimeout(resetShot, 900);
         }
-        
-        // Goal detection
-        if (ball.y < 200 && ball.x > 290 && ball.x < 510) {
+
+        // Goal
+        if (ball.y < 165 && ball.x > 295 && ball.x < 505) {
             score++;
             scoreEl.textContent = score;
+            setTimeout(resetShot, 800);
+        }
+
+        // Out
+        if (ball.y > 520 || ball.x < 0 || ball.x > canvas.width) {
             setTimeout(resetShot, 600);
         }
-        
-        // Out of bounds
-        if (ball.y > 500 || ball.x < 0 || ball.x > canvas.width) {
-            setTimeout(resetShot, 400);
-        }
+    }
+
+    // Animation progress
+    if (player.kicking) {
+        player.kickProgress += 0.2;
+        if (player.kickProgress > 4) player.kicking = false;
+    }
+
+    if (goalkeeper.diving) {
+        goalkeeper.diveProgress += 0.15;
+        if (goalkeeper.diveProgress > 5) goalkeeper.diving = null;
     }
 }
 
@@ -126,14 +175,14 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// Mouse controls
+// Controls (giữ nguyên)
 canvas.addEventListener('mousedown', (e) => {
     if (gameOver || ball.shooting) return;
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    
-    if (Math.hypot(mx - ball.x, my - ball.y) < 40) {
+
+    if (Math.hypot(mx - ball.x, my - ball.y) < 50) {
         isDragging = true;
         dragStartX = mx;
         dragStartY = my;
@@ -150,34 +199,37 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseup', (e) => {
     if (!isDragging) return;
     isDragging = false;
-    
+
     const rect = canvas.getBoundingClientRect();
     const endX = e.clientX - rect.left;
     const endY = e.clientY - rect.top;
-    
-    const power = Math.min(Math.hypot(dragStartX - endX, dragStartY - endY) / 8, 25);
-    
-    ball.vx = (ball.x - endX) * 0.12;
-    ball.vy = (ball.y - endY) * 0.12;
+
+    ball.vx = (ball.x - endX) * 0.14;
+    ball.vy = (ball.y - endY) * 0.135;
     ball.shooting = true;
-    
+
+    player.kicking = true;
+    player.kickProgress = 0;
+
     shots++;
     shotsEl.textContent = `${shots}/${maxShots}`;
-    
+
     if (shots >= maxShots) {
-        setTimeout(() => gameOver = true, 1200);
+        setTimeout(() => gameOver = true, 1600);
     }
 });
 
 function resetShot() {
-    ball.x = 400;
-    ball.y = 420;
+    ball.x = 150;
+    ball.y = 380;
     ball.vx = 0;
     ball.vy = 0;
     ball.shooting = false;
-    
-    // Move goalkeeper randomly
-    goalkeeper.x = 280 + Math.random() * 160;
+    player.kicking = false;
+
+    goalkeeper.x = 360 + Math.random() * 70;
+    goalkeeper.targetX = goalkeeper.x;
+    goalkeeper.diving = null;
 }
 
 restartBtn.addEventListener('click', () => {
@@ -189,6 +241,7 @@ restartBtn.addEventListener('click', () => {
     resetShot();
 });
 
-// Start game
+// Init
+loadImages();
 resetShot();
 gameLoop();
